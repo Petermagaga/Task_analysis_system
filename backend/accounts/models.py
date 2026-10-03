@@ -19,7 +19,8 @@ class User(AbstractUser):
         max_length=50,
         blank=True,
     )
-    department=models.ForeignKey("companies.Department",on_delete=models.PROTECT,)
+    department=models.ForeignKey("companies.Department",on_delete=models.PROTECT,
+                                 related_name="users",null=True,blank=True,)
     company=models.ForeignKey("companies.Company",on_delete=models.PROTECT,related_name="users",)
     role=models.CharField(max_length=20,choices=Role.choices,
                             default=Role.EMPLOYEE)

@@ -43,9 +43,10 @@ class Department(models.Model):
 
     class Meta:
         ordering=["name"]
-        contraints=[
-            models.UniqueConstraint(fields=["company","code"],
-                                    name="unique_department_code_per_company",),
+        constraints=[
+            models.UniqueConstraint(
+                fields=["company","code"],
+                name="unique_department_code_per_company",),
         ]
     def __str__(self):
         return f"{self.name} ({self.company.code})"
