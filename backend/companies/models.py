@@ -1,6 +1,7 @@
 import uuid
 
 from django.db import models
+from django.core.exceptions import ValidationError
 
 class Company(models.Model):
     """
@@ -72,7 +73,60 @@ class WorkSchedule(models.Model):
     is_active=models.BooleanField(default=True)
     created_at=models.DateTimeField(auto_now_add=True)
     updated_at=models.DateTimeField(auto_now_add=True)
-    
+        
+    def clean(self):
+        errors = {}
+
+        if self.start_time and self.end_time:
+            if self.start_time >= self.end_time:
+                errors["end_time"] = (
+                    "End time must be later than start time."
+                )
+
+        if self.break_start and self.break_end:
+            if self.break_start >= self.break_end:
+                errors["break_end"] = (
+                    "Break end time must be later than break start time."
+                )
+
+        if self.break_start and self.start_time:
+            if self.break_start < self.start_time:
+                errors["break_start"] = (
+                    "Break must start after the working day starts."
+                )
+
+        if self.break_end and self.end_time:
+            if self.break_end > self.end_time:
+                errors["break_end"] = (
+                    "Break must end before the working day ends."
+                )
+
+        if bool(self.break_start) != bool(self.break_end):
+            errors["break_start"] = (
+                "Break start and break end must both be provided."
+            )
+
+        if not self.working_days:
+            errors["working_days"] = (
+                "At least one working day must be selected."
+            )
+
+        invalid_days = [
+            day
+            for day in self.working_days
+            if not isinstance(day, int) or day < 0 or day > 6
+        ]
+
+        if invalid_days:
+            errors["working_days"] = (
+                "Working days must contain integers from 0 to 6."
+            )
+
+        if errors:
+            raise ValidationError(errors)
+
+
+
     class Meta:
         ordering=["name"]
 
