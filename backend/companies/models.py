@@ -24,3 +24,29 @@ class Company(models.Model):
 
     def __str__(self):
         return f"{self.name} ({self.code})"
+
+
+class Department(models.Model):
+    """
+    Organizational department belonging to a company
+    """
+    id=models.UUIDField(primary_key=True,default=uuid.uuid4,editable=False)
+    company=models.ForeignKey(Company,on_delete=models.PROTECT,related_name="departments",)
+    name=models.CharField(max_length=150)
+    code=models.CharField(max_length=50)
+    description=models.TextField(
+        blank=True
+    )
+    is_active=models.BooleanField(default=True)
+    created_at= models.DateTimeField(auto_now_add=True,)
+    updated_at=models.DateTimeField(auto_now=True,)
+
+    class Meta:
+        ordering=["name"]
+        contraints=[
+            models.UniqueConstraint(fields=["company","code"],
+                                    name="unique_department_code_per_company",),
+        ]
+    def __str__(self):
+        return f"{self.name} ({self.company.code})"
+
