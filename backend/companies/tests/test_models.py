@@ -2,7 +2,7 @@ from django.db import IntegrityError
 from django.test import TestCase
 from django.core.exceptions import ValidationError
 from companies.models import Company, Department,WorkSchedule,WorkItem
-
+from accounts.models import User
 
 class CompanyModelTests(TestCase):
 
@@ -169,4 +169,123 @@ class WorkScheduleModelTests(TestCase):
 
         with self.assertRaises(ValidationError):
             schedule.full_clean()
-        
+
+class WorkItemModelTests(TestCase):
+
+    def setUp(self):
+        self.company = Company.objects.create(
+            name="Test Company",
+            code="TEST",
+        )
+
+        self.department = Department.objects.create(
+            company=self.company,
+            name="Production",
+            code="PROD",
+        )
+
+        self.user = User.objects.create_user(
+            username="employee",
+            email="employee@test.com",
+            password="TestPassword123!",
+            company=self.company,
+            department=self.department,
+            role=User.Role.EMPLOYEE,
+            first_name="Test",
+            last_name="Employee",
+        )
+
+    def test_work_item_has_uuid(self):
+        work_item = WorkItem.objects.create(
+            company=self.company,
+            department=self.department,
+            owner=self.user,
+            title="Repair stitching machine",
+            planned_at="2026-10-04 08:00:00",
+        )
+
+        self.assertIsNotNone(work_item.id)
+
+    def test_work_item_defaults_to_draft(self):
+        work_item = WorkItem.objects.create(
+            company=self.company,
+            department=self.department,
+            owner=self.user,
+            title="Repair stitching machine",
+            planned_at="2026-10-04 08:00:00",
+        )
+
+        self.assertEqual(
+            work_item.status,
+            WorkItem.Status.DRAFT,
+        )
+
+    def test_work_item_defaults_to_task(self):
+        work_item = WorkItem.objects.create(
+            company=self.company,
+            department=self.department,
+            owner=self.user,
+            title="Repair stitching machine",
+            planned_at="2026-10-04 08:00:00",
+        )
+
+        self.assertEqual(
+            work_item.work_type,
+            WorkItem.WorkType.TASK,
+        )
+
+    def test_work_item_belongs_to_company(self):
+        work_item = WorkItem.objects.create(
+            company=self.company,
+            department=self.department,
+            owner=self.user,
+            title="Repair stitching machine",
+            planned_at="2026-10-04 08:00:00",
+        )
+
+        self.assertEqual(
+            work_item.company,
+            self.company,
+        )
+
+    def test_work_item_belongs_to_department(self):
+        work_item = WorkItem.objects.create(
+            company=self.company,
+            department=self.department,
+            owner=self.user,
+            title="Repair stitching machine",
+            planned_at="2026-10-04 08:00:00",
+        )
+
+        self.assertEqual(
+            work_item.department,
+            self.department,
+        )
+
+    def test_work_item_has_owner(self):
+        work_item = WorkItem.objects.create(
+            company=self.company,
+            department=self.department,
+            owner=self.user,
+            title="Repair stitching machine",
+            planned_at="2026-10-04 08:00:00",
+        )
+
+        self.assertEqual(
+            work_item.owner,
+            self.user,
+        )
+
+    def test_work_item_string_representation(self):
+        work_item = WorkItem.objects.create(
+            company=self.company,
+            department=self.department,
+            owner=self.user,
+            title="Repair stitching machine",
+            planned_at="2026-10-04 08:00:00",
+        )
+
+        self.assertEqual(
+            str(work_item),
+            "Repair stitching machine",
+        )
