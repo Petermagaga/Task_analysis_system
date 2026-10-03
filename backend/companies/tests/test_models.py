@@ -1,7 +1,7 @@
 from django.db import IntegrityError
 from django.test import TestCase
 from django.core.exceptions import ValidationError
-from companies.models import Company, Department,WorkSchedule
+from companies.models import Company, Department,WorkSchedule,WorkItem
 
 
 class CompanyModelTests(TestCase):
@@ -169,3 +169,4 @@ class WorkScheduleModelTests(TestCase):
 
         with self.assertRaises(ValidationError):
             schedule.full_clean()
+        

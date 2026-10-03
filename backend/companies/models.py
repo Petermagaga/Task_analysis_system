@@ -132,3 +132,81 @@ class WorkSchedule(models.Model):
 
     def __str__(self):
         return f"{self.name} ({self.company.code})"
+
+class WorkItem(models.Model):
+
+    class WorkType(models.TextChoices):
+        TASK = "TASK", "Task"
+        MEETING = "MEETING", "Meeting"
+        ROUTINE = "ROUTINE", "Routine"
+        SUPPORT = "SUPPORT", "Support"
+        TRAINING = "TRAINING", "Training"
+        PROJECT = "PROJECT", "Project"
+        INCIDENT = "INCIDENT", "Incident"
+        OTHER = "OTHER", "Other"
+
+    class Status(models.TextChoices):
+        DRAFT = "DRAFT", "Draft"
+        PLANNED = "PLANNED", "Planned"
+        IN_PROGRESS = "IN_PROGRESS", "In Progress"
+        PARTIALLY_COMPLETED = "PARTIALLY_COMPLETED", "Partially Completed"
+        COMPLETED = "COMPLETED", "Completed"
+        BLOCKED = "BLOCKED", "Blocked"
+        DEFERRED = "DEFERRED", "Deferred"
+        CANCELLED = "CANCELLED", "Cancelled"
+        REVIEWED = "REVIEWED", "Reviewed"
+        ARCHIVED = "ARCHIVED", "Archived"
+
+    id = models.UUIDField(
+        primary_key=True,
+        default=uuid.uuid4,
+        editable=False,
+    )
+
+    company = models.ForeignKey(
+        Company,
+        on_delete=models.PROTECT,
+        related_name="work_items",
+    )
+
+    department = models.ForeignKey(
+        Department,
+        on_delete=models.PROTECT,
+        related_name="work_items",
+    )
+
+    owner = models.ForeignKey(
+        "accounts.User",
+        on_delete=models.PROTECT,
+        related_name="owned_work_items",
+    )
+
+    title = models.CharField(max_length=255)
+
+    description = models.TextField(blank=True)
+
+    work_type = models.CharField(
+        max_length=30,
+        choices=WorkType.choices,
+        default=WorkType.TASK,
+    )
+
+    status = models.CharField(
+        max_length=30,
+        choices=Status.choices,
+        default=Status.DRAFT,
+    )
+
+    planned_at = models.DateTimeField()
+
+    due_at = models.DateTimeField(
+        null=True,
+        blank=True,
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return self.title
