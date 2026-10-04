@@ -3,6 +3,8 @@ from django.test import TestCase
 from django.core.exceptions import ValidationError
 from companies.models import Company, Department,WorkSchedule,WorkItem
 from accounts.models import User
+from django.utils import timezone
+import datetime
 
 class CompanyModelTests(TestCase):
 
@@ -201,7 +203,7 @@ class WorkItemModelTests(TestCase):
             department=self.department,
             owner=self.user,
             title="Repair stitching machine",
-            planned_at="2026-10-04 08:00:00",
+            planned_at = timezone.make_aware(datetime.datetime(2026, 10, 4, 8, 0, 0)),
         )
 
         self.assertIsNotNone(work_item.id)
