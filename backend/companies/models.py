@@ -208,5 +208,51 @@ class WorkItem(models.Model):
 
     updated_at = models.DateTimeField(auto_now=True)
 
+    def clean(self):
+        errors = {}
+
+        # ---------------------------------------------------------
+        # 1. Due date cannot be before planned date
+        # ---------------------------------------------------------
+        if self.due_at and self.planned_at:
+            if self.due_at < self.planned_at:
+                errors["due_at"] = (
+                    "Due date and time cannot be earlier "
+                    "than the planned date and time."
+                )
+
+        # ---------------------------------------------------------
+        # 2. Department must belong to the same company
+        # ---------------------------------------------------------
+        if self.company_id and self.department_id:
+            if self.department.company_id != self.company_id:
+                errors["department"] = (
+                    "Department must belong to the same company "
+                    "as the work item."
+                )
+
+        # ---------------------------------------------------------
+        # 3. Owner must belong to the same company
+        # ---------------------------------------------------------
+        if self.company_id and self.owner_id:
+            if self.owner.company_id != self.company_id:
+                errors["owner"] = (
+                    "Owner must belong to the same company "
+                    "as the work item."
+                )
+
+        # ---------------------------------------------------------
+        # 4. Owner's department must match WorkItem department
+        # ---------------------------------------------------------
+        if self.department_id and self.owner_id:
+            if self.owner.department_id != self.department_id:
+                errors["owner"] = (
+                    "Owner must belong to the same department "
+                    "as the work item."
+                )
+
+        if errors:
+            raise ValidationError(errors)
+
     def __str__(self):
         return self.title
