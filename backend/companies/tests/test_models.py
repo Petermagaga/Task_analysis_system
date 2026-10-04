@@ -289,3 +289,98 @@ class WorkItemModelTests(TestCase):
             str(work_item),
             "Repair stitching machine",
         )
+
+    def test_due_date_cannot_be_before_planned_date(self):
+        work_item = WorkItem(
+            company=self.company,
+            department=self.department,
+            owner=self.user,
+            title="Repair stitching machine",
+            planned_at="2026-10-04 10:00:00",
+            due_at="2026-10-04 09:00:00",
+        )
+
+        with self.assertRaises(ValidationError):
+            work_item.full_clean()
+
+    def test_owner_must_belong_to_same_company(self):
+        other_company = Company.objects.create(
+            name="Other Company",
+            code="OTHER",
+        )
+
+        other_department = Department.objects.create(
+            company=other_company,
+            name="Operations",
+            code="OPS",
+        )
+
+        other_user = User.objects.create_user(
+            username="other_employee",
+            email="other@test.com",
+            password="TestPassword123!",
+            company=other_company,
+            department=other_department,
+            role=User.Role.EMPLOYEE,
+        )
+
+        work_item = WorkItem(
+            company=self.company,
+            department=self.department,
+            owner=other_user,
+            title="Invalid company ownership",
+            planned_at="2026-10-04 08:00:00",
+        )
+
+        with self.assertRaises(ValidationError):
+            work_item.full_clean()
+
+    def test_department_must_belong_to_same_company(self):
+        other_company = Company.objects.create(
+            name="Other Company",
+            code="OTHER",
+        )
+
+        other_department = Department.objects.create(
+            company=other_company,
+            name="Operations",
+            code="OPS",
+        )
+
+        work_item = WorkItem(
+            company=self.company,
+            department=other_department,
+            owner=self.user,
+            title="Invalid department",
+            planned_at="2026-10-04 08:00:00",
+        )
+
+        with self.assertRaises(ValidationError):
+            work_item.full_clean()
+
+    def test_owner_department_must_match_work_item_department(self):
+        finance = Department.objects.create(
+            company=self.company,
+            name="Finance",
+            code="FIN",
+        )
+
+        finance_user = User.objects.create_user(
+            username="finance_employee",
+            email="finance@test.com",
+            password="TestPassword123!",
+            company=self.company,
+            department=finance,
+            role=User.Role.EMPLOYEE,
+        )
+
+        work_item = WorkItem(
+            company=self.company,
+            department=self.department,  # Production
+            owner=finance_user,           # Finance
+            title="Invalid department ownership",
+            planned_at="2026-10-04 08:00:00",
+        )
+
+        with self.assertRaises(ValidationError):
+            work_item.full_clean()
