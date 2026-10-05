@@ -1,7 +1,7 @@
 from django.db import IntegrityError
 from django.test import TestCase
 from django.core.exceptions import ValidationError
-from companies.models import Company, Department, WorkSchedule, WorkItem
+from companies.models import (Company, Department, WorkSchedule, WorkItem,WorkExecution,)
 from accounts.models import User
 from zoneinfo import ZoneInfo
 from datetime import datetime
@@ -394,3 +394,305 @@ class WorkItemModelTests(TestCase):
 
         with self.assertRaises(ValidationError):
             work_item.full_clean()
+
+
+class WorkExecutionModelTests(TestCase):
+
+    def setUp(self):
+        self.company = Company.objects.create(
+            name="Test Company",
+            code="TEST",
+        )
+
+        self.department = Department.objects.create(
+            company=self.company,
+            name="Production",
+            code="PROD",
+        )
+
+        self.user = User.objects.create_user(
+            username="employee",
+            email="employee@test.com",
+            password="TestPassword123!",
+            company=self.company,
+            department=self.department,
+            role=User.Role.EMPLOYEE,
+            first_name="Test",
+            last_name="Employee",
+        )
+
+        self.work_item = WorkItem.objects.create(
+            company=self.company,
+            department=self.department,
+            owner=self.user,
+            title="Repair stitching machine",
+            planned_at=datetime(
+                2026,
+                10,
+                5,
+                8,
+                0,
+                tzinfo=ZoneInfo("Africa/Nairobi"),
+            ),
+        )
+
+    def test_work_execution_has_uuid(self):
+        execution = WorkExecution.objects.create(
+            company=self.company,
+            work_item=self.work_item,
+            employee=self.user,
+            started_at=datetime(
+                2026,
+                10,
+                5,
+                8,
+                15,
+                tzinfo=ZoneInfo("Africa/Nairobi"),
+            ),
+        )
+
+        self.assertIsNotNone(execution.id)
+
+    def test_execution_can_have_no_end_time(self):
+        execution = WorkExecution.objects.create(
+            company=self.company,
+            work_item=self.work_item,
+            employee=self.user,
+            started_at=datetime(
+                2026,
+                10,
+                5,
+                8,
+                15,
+                tzinfo=ZoneInfo("Africa/Nairobi"),
+            ),
+        )
+
+        self.assertIsNone(execution.ended_at)
+
+    def test_execution_can_have_end_time(self):
+        execution = WorkExecution.objects.create(
+            company=self.company,
+            work_item=self.work_item,
+            employee=self.user,
+            started_at=datetime(
+                2026,
+                10,
+                5,
+                8,
+                15,
+                tzinfo=ZoneInfo("Africa/Nairobi"),
+            ),
+            ended_at=datetime(
+                2026,
+                10,
+                5,
+                9,
+                30,
+                tzinfo=ZoneInfo("Africa/Nairobi"),
+            ),
+        )
+
+        self.assertIsNotNone(execution.ended_at)
+
+    def test_end_time_cannot_be_before_start_time(self):
+        execution = WorkExecution(
+            company=self.company,
+            work_item=self.work_item,
+            employee=self.user,
+            started_at=datetime(
+                2026,
+                10,
+                5,
+                9,
+                30,
+                tzinfo=ZoneInfo("Africa/Nairobi"),
+            ),
+            ended_at=datetime(
+                2026,
+                10,
+                5,
+                8,
+                15,
+                tzinfo=ZoneInfo("Africa/Nairobi"),
+            ),
+        )
+
+        with self.assertRaises(ValidationError):
+            execution.full_clean()
+
+    def test_company_must_match_work_item_company(self):
+        other_company = Company.objects.create(
+            name="Other Company",
+            code="OTHER",
+        )
+
+        execution = WorkExecution(
+            company=other_company,
+            work_item=self.work_item,
+            employee=self.user,
+            started_at=datetime(
+                2026,
+                10,
+                5,
+                8,
+                15,
+                tzinfo=ZoneInfo("Africa/Nairobi"),
+            ),
+        )
+
+        with self.assertRaises(ValidationError):
+            execution.full_clean()
+
+    def test_employee_must_belong_to_execution_company(self):
+        other_company = Company.objects.create(
+            name="Other Company",
+            code="OTHER",
+        )
+
+        other_department = Department.objects.create(
+            company=other_company,
+            name="Operations",
+            code="OPS",
+        )
+
+        other_user = User.objects.create_user(
+            username="other_employee",
+            email="other@test.com",
+            password="TestPassword123!",
+            company=other_company,
+            department=other_department,
+            role=User.Role.EMPLOYEE,
+        )
+
+        execution = WorkExecution(
+            company=self.company,
+            work_item=self.work_item,
+            employee=other_user,
+            started_at=datetime(
+                2026,
+                10,
+                5,
+                8,
+                15,
+                tzinfo=ZoneInfo("Africa/Nairobi"),
+            ),
+        )
+
+        with self.assertRaises(ValidationError):
+            execution.full_clean()
+
+    def test_employee_from_another_department_can_execute_work(self):
+        finance = Department.objects.create(
+            company=self.company,
+            name="Finance",
+            code="FIN",
+        )
+
+        finance_user = User.objects.create_user(
+            username="finance_employee",
+            email="finance@test.com",
+            password="TestPassword123!",
+            company=self.company,
+            department=finance,
+            role=User.Role.EMPLOYEE,
+        )
+
+        execution = WorkExecution.objects.create(
+            company=self.company,
+            work_item=self.work_item,
+            employee=finance_user,
+            started_at=datetime(
+                2026,
+                10,
+                5,
+                8,
+                15,
+                tzinfo=ZoneInfo("Africa/Nairobi"),
+            ),
+        )
+
+        self.assertEqual(
+            execution.employee,
+            finance_user,
+        )
+
+    def test_work_item_can_have_multiple_executions(self):
+        first_execution = WorkExecution.objects.create(
+            company=self.company,
+            work_item=self.work_item,
+            employee=self.user,
+            started_at=datetime(
+                2026,
+                10,
+                5,
+                8,
+                15,
+                tzinfo=ZoneInfo("Africa/Nairobi"),
+            ),
+            ended_at=datetime(
+                2026,
+                10,
+                5,
+                9,
+                0,
+                tzinfo=ZoneInfo("Africa/Nairobi"),
+            ),
+        )
+
+        second_execution = WorkExecution.objects.create(
+            company=self.company,
+            work_item=self.work_item,
+            employee=self.user,
+            started_at=datetime(
+                2026,
+                10,
+                5,
+                14,
+                0,
+                tzinfo=ZoneInfo("Africa/Nairobi"),
+            ),
+            ended_at=datetime(
+                2026,
+                10,
+                5,
+                14,
+                45,
+                tzinfo=ZoneInfo("Africa/Nairobi"),
+            ),
+        )
+
+        self.assertEqual(
+            self.work_item.executions.count(),
+            2,
+        )
+
+        self.assertIn(
+            first_execution,
+            self.work_item.executions.all(),
+        )
+
+        self.assertIn(
+            second_execution,
+            self.work_item.executions.all(),
+        )
+
+    def test_work_execution_string_representation(self):
+        execution = WorkExecution.objects.create(
+            company=self.company,
+            work_item=self.work_item,
+            employee=self.user,
+            started_at=datetime(
+                2026,
+                10,
+                5,
+                8,
+                15,
+                tzinfo=ZoneInfo("Africa/Nairobi"),
+            ),
+        )
+
+        self.assertEqual(
+            str(execution),
+            "Repair stitching machine - Test Employee",
+        )
