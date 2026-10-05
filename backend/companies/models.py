@@ -256,3 +256,92 @@ class WorkItem(models.Model):
 
     def __str__(self):
         return self.title
+
+class WorkExecution(models.Model):
+
+    id = models.UUIDField(
+        primary_key=True,
+        default=uuid.uuid4,
+        editable=False,
+    )
+
+    company = models.ForeignKey(
+        Company,
+        on_delete=models.PROTECT,
+        related_name="work_executions",
+    )
+
+    work_item = models.ForeignKey(
+        WorkItem,
+        on_delete=models.PROTECT,
+        related_name="executions",
+    )
+
+    employee = models.ForeignKey(
+        "accounts.User",
+        on_delete=models.PROTECT,
+        related_name="work_executions",
+    )
+
+    started_at = models.DateTimeField()
+
+    ended_at = models.DateTimeField(
+        null=True,
+        blank=True,
+    )
+
+    notes = models.TextField(
+        blank=True,
+    )
+
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+    )
+
+    updated_at = models.DateTimeField(
+        auto_now=True,
+    )
+
+    def clean(self):
+        errors = {}
+
+        # ---------------------------------------------------------
+        # 1. End time cannot be before start time
+        # ---------------------------------------------------------
+        if self.ended_at and self.started_at:
+            if self.ended_at < self.started_at:
+                errors["ended_at"] = (
+                    "End time cannot be earlier than start time."
+                )
+
+        # ---------------------------------------------------------
+        # 2. Execution company must match WorkItem company
+        # ---------------------------------------------------------
+        if self.company_id and self.work_item_id:
+            if self.work_item.company_id != self.company_id:
+                errors["company"] = (
+                    "Execution must belong to the same company "
+                    "as the work item."
+                )
+
+        # ---------------------------------------------------------
+        # 3. Employee must belong to execution company
+        # ---------------------------------------------------------
+        if self.company_id and self.employee_id:
+            if self.employee.company_id != self.company_id:
+                errors["employee"] = (
+                    "Employee must belong to the same company "
+                    "as the execution."
+                )
+
+        if errors:
+            raise ValidationError(errors)
+
+    def __str__(self):
+        return (
+            f"{self.work_item.title} - "
+            f"{self.employee}"
+        )        
+
+
+
