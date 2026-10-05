@@ -1,6 +1,7 @@
+from datetime import datetime
+from zoneinfo import ZoneInfo
 from django.core.exceptions import ValidationError
 from django.test import TestCase
-
 from accounts.models import User
 from companies.models import Company, Department, WorkItem
 from work_items.services import transition_work_item
@@ -29,12 +30,21 @@ class WorkItemTransitionTests(TestCase):
             role=User.Role.EMPLOYEE,
         )
 
+        planned_time = datetime(
+            2026,
+            10,
+            4,
+            8,
+            0,
+            tzinfo=ZoneInfo("Africa/Nairobi"),
+        )
+
         self.work_item = WorkItem.objects.create(
             company=self.company,
             department=self.department,
             owner=self.user,
             title="Repair stitching machine",
-            planned_at="2026-10-04 08:00:00",
+            planned_at=planned_time,
         )
 
     def test_draft_can_become_planned(self):

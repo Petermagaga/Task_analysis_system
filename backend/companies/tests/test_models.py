@@ -1,10 +1,10 @@
 from django.db import IntegrityError
 from django.test import TestCase
 from django.core.exceptions import ValidationError
-from companies.models import Company, Department,WorkSchedule,WorkItem
+from companies.models import Company, Department, WorkSchedule, WorkItem
 from accounts.models import User
-from django.utils import timezone
-import datetime
+from zoneinfo import ZoneInfo
+from datetime import datetime
 
 class CompanyModelTests(TestCase):
 
@@ -81,6 +81,7 @@ class DepartmentModelTests(TestCase):
         )
 
         self.assertEqual(department.code, "FIN")
+
 
 class WorkScheduleModelTests(TestCase):
 
@@ -172,6 +173,7 @@ class WorkScheduleModelTests(TestCase):
         with self.assertRaises(ValidationError):
             schedule.full_clean()
 
+
 class WorkItemModelTests(TestCase):
 
     def setUp(self):
@@ -197,13 +199,19 @@ class WorkItemModelTests(TestCase):
             last_name="Employee",
         )
 
+        # Timezone-aware base datetimes for testing
+        self.tz = ZoneInfo("Africa/Nairobi")
+        self.planned_time = datetime(2026, 10, 4, 8, 0, tzinfo=self.tz)
+        self.due_time = datetime(2026, 10, 4, 10, 0, tzinfo=self.tz)
+        self.early_time = datetime(2026, 10, 4, 7, 0, tzinfo=self.tz)
+
     def test_work_item_has_uuid(self):
         work_item = WorkItem.objects.create(
             company=self.company,
             department=self.department,
             owner=self.user,
             title="Repair stitching machine",
-            planned_at = timezone.make_aware(datetime.datetime(2026, 10, 4, 8, 0, 0)),
+            planned_at=self.planned_time,
         )
 
         self.assertIsNotNone(work_item.id)
@@ -214,7 +222,7 @@ class WorkItemModelTests(TestCase):
             department=self.department,
             owner=self.user,
             title="Repair stitching machine",
-            planned_at="2026-10-04 08:00:00",
+            planned_at=self.planned_time,
         )
 
         self.assertEqual(
@@ -228,7 +236,7 @@ class WorkItemModelTests(TestCase):
             department=self.department,
             owner=self.user,
             title="Repair stitching machine",
-            planned_at="2026-10-04 08:00:00",
+            planned_at=self.planned_time,
         )
 
         self.assertEqual(
@@ -242,7 +250,7 @@ class WorkItemModelTests(TestCase):
             department=self.department,
             owner=self.user,
             title="Repair stitching machine",
-            planned_at="2026-10-04 08:00:00",
+            planned_at=self.planned_time,
         )
 
         self.assertEqual(
@@ -256,7 +264,7 @@ class WorkItemModelTests(TestCase):
             department=self.department,
             owner=self.user,
             title="Repair stitching machine",
-            planned_at="2026-10-04 08:00:00",
+            planned_at=self.planned_time,
         )
 
         self.assertEqual(
@@ -270,7 +278,7 @@ class WorkItemModelTests(TestCase):
             department=self.department,
             owner=self.user,
             title="Repair stitching machine",
-            planned_at="2026-10-04 08:00:00",
+            planned_at=self.planned_time,
         )
 
         self.assertEqual(
@@ -284,7 +292,7 @@ class WorkItemModelTests(TestCase):
             department=self.department,
             owner=self.user,
             title="Repair stitching machine",
-            planned_at="2026-10-04 08:00:00",
+            planned_at=self.planned_time,
         )
 
         self.assertEqual(
@@ -298,8 +306,8 @@ class WorkItemModelTests(TestCase):
             department=self.department,
             owner=self.user,
             title="Repair stitching machine",
-            planned_at="2026-10-04 10:00:00",
-            due_at="2026-10-04 09:00:00",
+            planned_at=self.planned_time,
+            due_at=self.early_time,  # 07:00 is before 08:00
         )
 
         with self.assertRaises(ValidationError):
@@ -331,7 +339,7 @@ class WorkItemModelTests(TestCase):
             department=self.department,
             owner=other_user,
             title="Invalid company ownership",
-            planned_at="2026-10-04 08:00:00",
+            planned_at=self.planned_time,
         )
 
         with self.assertRaises(ValidationError):
@@ -354,7 +362,7 @@ class WorkItemModelTests(TestCase):
             department=other_department,
             owner=self.user,
             title="Invalid department",
-            planned_at="2026-10-04 08:00:00",
+            planned_at=self.planned_time,
         )
 
         with self.assertRaises(ValidationError):
@@ -381,7 +389,7 @@ class WorkItemModelTests(TestCase):
             department=self.department,  # Production
             owner=finance_user,           # Finance
             title="Invalid department ownership",
-            planned_at="2026-10-04 08:00:00",
+            planned_at=self.planned_time,
         )
 
         with self.assertRaises(ValidationError):
