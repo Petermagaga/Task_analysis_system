@@ -337,6 +337,12 @@ class WorkExecution(models.Model):
         if errors:
             raise ValidationError(errors)
 
+    @property
+    def duration(self):
+        if not self.ended_at:
+            return None
+        return self.ended_at-self.started_at
+
     def __str__(self):
         return (
             f"{self.work_item.title} - "

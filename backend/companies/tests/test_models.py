@@ -696,3 +696,36 @@ class WorkExecutionModelTests(TestCase):
             str(execution),
             "Repair stitching machine - Test Employee",
         )
+
+    def test_duration_is_calculated_from_start_and_end(self):
+        execution = WorkExecution.objects.create(
+            company=self.company,
+            work_item=self.work_item,
+            employee=self.user,
+            started_at=datetime(
+                2026, 10, 5, 8, 15,
+                tzinfo=ZoneInfo("Africa/Nairobi"),
+            ),
+            ended_at=datetime(
+                2026, 10, 5, 9, 0,
+                tzinfo=ZoneInfo("Africa/Nairobi"),
+            ),
+        )
+
+        self.assertEqual(
+            execution.duration.total_seconds(),
+            45 * 60,
+        )
+
+    def test_active_execution_has_no_duration(self):
+        execution = WorkExecution.objects.create(
+            company=self.company,
+            work_item=self.work_item,
+            employee=self.user,
+            started_at=datetime(
+                2026, 10, 5, 8, 15,
+                tzinfo=ZoneInfo("Africa/Nairobi"),
+            ),
+        )
+
+        self.assertIsNone(execution.duration)
