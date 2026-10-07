@@ -1,7 +1,7 @@
 from django.db import IntegrityError
 from django.test import TestCase
 from django.core.exceptions import ValidationError
-from companies.models import (Company, Department, WorkSchedule, WorkItem,WorkExecution,)
+from companies.models import (Company, Department, WorkSchedule, WorkItem,WorkExecution,Outcome)
 from accounts.models import User
 from zoneinfo import ZoneInfo
 from datetime import datetime
@@ -729,3 +729,184 @@ class WorkExecutionModelTests(TestCase):
         )
 
         self.assertIsNone(execution.duration)
+
+
+class OutcomeModelTests(TestCase):
+
+    def setUp(self):
+        self.company = Company.objects.create(
+            name="Test Company",
+            code="TEST",
+        )
+
+        self.department = Department.objects.create(
+            company=self.company,
+            name="Production",
+            code="PROD",
+        )
+
+        self.employee = User.objects.create_user(
+            username="employee",
+            email="employee@test.com",
+            password="TestPassword123!",
+            company=self.company,
+            department=self.department,
+            role=User.Role.EMPLOYEE,
+            first_name="Test",
+            last_name="Employee",
+        )
+
+        self.work_item = WorkItem.objects.create(
+            company=self.company,
+            department=self.department,
+            owner=self.employee,
+            title="Repair stitching machine",
+            planned_at=datetime(
+                2026,
+                10,
+                7,
+                8,
+                0,
+                tzinfo=ZoneInfo("Africa/Nairobi"),
+            ),
+        )
+
+    def test_outcome_has_uuid(self):
+        outcome = Outcome.objects.create(
+            company=self.company,
+            work_item=self.work_item,
+            employee=self.employee,
+            description="Machine repaired successfully.",
+        )
+
+        self.assertIsNotNone(outcome.id)
+
+    def test_outcome_is_unconfirmed_by_default(self):
+        outcome = Outcome.objects.create(
+            company=self.company,
+            work_item=self.work_item,
+            employee=self.employee,
+            description="Machine repaired successfully.",
+        )
+
+        self.assertFalse(outcome.is_confirmed)
+        self.assertIsNone(outcome.confirmed_at)
+
+    def test_confirmed_outcome_requires_confirmation_time(self):
+        outcome = Outcome(
+            company=self.company,
+            work_item=self.work_item,
+            employee=self.employee,
+            description="Machine repaired successfully.",
+            is_confirmed=True,
+        )
+
+        with self.assertRaises(ValidationError):
+            outcome.full_clean()
+
+    def test_unconfirmed_outcome_cannot_have_confirmation_time(self):
+        outcome = Outcome(
+            company=self.company,
+            work_item=self.work_item,
+            employee=self.employee,
+            description="Machine repaired successfully.",
+            is_confirmed=False,
+            confirmed_at=datetime(
+                2026,
+                10,
+                7,
+                9,
+                0,
+                tzinfo=ZoneInfo("Africa/Nairobi"),
+            ),
+        )
+
+        with self.assertRaises(ValidationError):
+            outcome.full_clean()
+
+    def test_confirmed_outcome_is_valid(self):
+        confirmed_at = datetime(
+            2026,
+            10,
+            7,
+            9,
+            0,
+            tzinfo=ZoneInfo("Africa/Nairobi"),
+        )
+
+        outcome = Outcome(
+            company=self.company,
+            work_item=self.work_item,
+            employee=self.employee,
+            description="Machine repaired successfully.",
+            is_confirmed=True,
+            confirmed_at=confirmed_at,
+        )
+
+        outcome.full_clean()
+
+        self.assertTrue(outcome.is_confirmed)
+        self.assertEqual(
+            outcome.confirmed_at,
+            confirmed_at,
+        )
+
+    def test_outcome_company_must_match_work_item_company(self):
+        other_company = Company.objects.create(
+            name="Other Company",
+            code="OTHER",
+        )
+
+        outcome = Outcome(
+            company=other_company,
+            work_item=self.work_item,
+            employee=self.employee,
+            description="Machine repaired successfully.",
+        )
+
+        with self.assertRaises(ValidationError):
+            outcome.full_clean()
+
+    def test_employee_must_belong_to_outcome_company(self):
+        other_company = Company.objects.create(
+            name="Other Company",
+            code="OTHER",
+        )
+
+        other_department = Department.objects.create(
+            company=other_company,
+            name="Operations",
+            code="OPS",
+        )
+
+        other_employee = User.objects.create_user(
+            username="other_employee",
+            email="other@test.com",
+            password="TestPassword123!",
+            company=other_company,
+            department=other_department,
+            role=User.Role.EMPLOYEE,
+        )
+
+        outcome = Outcome(
+            company=self.company,
+            work_item=self.work_item,
+            employee=other_employee,
+            description="Machine repaired successfully.",
+        )
+
+        with self.assertRaises(ValidationError):
+            outcome.full_clean()
+
+    def test_outcome_string_representation(self):
+        outcome = Outcome.objects.create(
+            company=self.company,
+            work_item=self.work_item,
+            employee=self.employee,
+            description="Machine repaired successfully.",
+        )
+
+        self.assertEqual(
+            str(outcome),
+            "Repair stitching machine - Test Employee",
+        )
