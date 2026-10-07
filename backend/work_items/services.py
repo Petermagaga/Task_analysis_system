@@ -1,5 +1,8 @@
 from django.core.exceptions import ValidationError
+from django.db import transaction
+from django.utils import timezone
 
+from companies.models import WorkExecution
 
 STATUS_TRANSITIONS = {
     "DRAFT": {
@@ -76,3 +79,31 @@ def transition_work_item(work_item, new_status):
     work_item.save(update_fields=["status", "updated_at"])
 
     return work_item
+
+@transaction.atomic
+def start_execution(work_item,employee,started_at=None,notes="",):
+    if work_item.company_id !=employee.company_id:
+        raise ValidationError(
+            {
+                "employee":(
+                    "Employee must belong to the same company"
+                    "as the work item."
+                )
+            }
+        )
+    allowed_statuses={
+        "PLANNED",
+        "IN_PROGRESS",
+        "PARTIALLY_COMPLETED",
+        "BLOCKED",
+    }
+    if work_item.status not in allowed_statuses:
+        raise ValidationError(
+            {
+                "status":(
+                    f"Cannot start execution for a work item "
+                    f"with status {work_item.status}"
+                )
+            }
+        )
+    
