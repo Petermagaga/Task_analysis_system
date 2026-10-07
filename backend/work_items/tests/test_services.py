@@ -169,3 +169,234 @@ class WorkItemTransitionTests(TestCase):
                 self.work_item,
                 WorkItem.Status.PLANNED,
             )
+
+class WorkExecutionServiceTests(TestCase):
+
+    def setUp(self):
+        self.company = Company.objects.create(
+            name="Test Company",
+            code="TEST",
+        )
+
+        self.department = Department.objects.create(
+            company=self.company,
+            name="Production",
+            code="PROD",
+        )
+
+        self.employee = User.objects.create_user(
+            username="employee",
+            email="employee@test.com",
+            password="TestPassword123!",
+            company=self.company,
+            department=self.department,
+            role=User.Role.EMPLOYEE,
+            first_name="Test",
+            last_name="Employee",
+        )
+
+        self.work_item = WorkItem.objects.create(
+            company=self.company,
+            department=self.department,
+            owner=self.employee,
+            title="Repair stitching machine",
+            planned_at=datetime(
+                2026,
+                10,
+                6,
+                8,
+                0,
+                tzinfo=ZoneInfo("Africa/Nairobi"),
+            ),
+            status=WorkItem.Status.PLANNED,
+        )
+
+    def test_start_execution_creates_active_execution(self):
+        started_at = datetime(
+            2026,
+            10,
+            6,
+            8,
+            15,
+            tzinfo=ZoneInfo("Africa/Nairobi"),
+        )
+
+        execution = start_execution(
+            work_item=self.work_item,
+            employee=self.employee,
+            started_at=started_at,
+        )
+
+        self.assertIsNotNone(execution.id)
+        self.assertEqual(execution.employee, self.employee)
+        self.assertEqual(execution.work_item, self.work_item)
+        self.assertEqual(execution.started_at, started_at)
+        self.assertIsNone(execution.ended_at)
+
+    def test_start_execution_moves_work_item_to_in_progress(self):
+        start_execution(
+            work_item=self.work_item,
+            employee=self.employee,
+            started_at=datetime(
+                2026,
+                10,
+                6,
+                8,
+                15,
+                tzinfo=ZoneInfo("Africa/Nairobi"),
+            ),
+        )
+
+        self.work_item.refresh_from_db()
+
+        self.assertEqual(
+            self.work_item.status,
+            WorkItem.Status.IN_PROGRESS,
+        )
+
+    def test_start_execution_rejects_employee_from_another_company(self):
+        other_company = Company.objects.create(
+            name="Other Company",
+            code="OTHER",
+        )
+
+        other_department = Department.objects.create(
+            company=other_company,
+            name="Operations",
+            code="OPS",
+        )
+
+        other_employee = User.objects.create_user(
+            username="other_employee",
+            email="other@test.com",
+            password="TestPassword123!",
+            company=other_company,
+            department=other_department,
+            role=User.Role.EMPLOYEE,
+        )
+
+        with self.assertRaises(ValidationError):
+            start_execution(
+                work_item=self.work_item,
+                employee=other_employee,
+            )
+
+    def test_draft_work_item_cannot_start_execution(self):
+        self.work_item.status = WorkItem.Status.DRAFT
+        self.work_item.save(
+            update_fields=["status", "updated_at"]
+        )
+
+        with self.assertRaises(ValidationError):
+            start_execution(
+                work_item=self.work_item,
+                employee=self.employee,
+            )
+
+    def test_stop_execution_sets_end_time(self):
+        started_at = datetime(
+            2026,
+            10,
+            6,
+            8,
+            15,
+            tzinfo=ZoneInfo("Africa/Nairobi"),
+        )
+
+        ended_at = datetime(
+            2026,
+            10,
+            6,
+            9,
+            0,
+            tzinfo=ZoneInfo("Africa/Nairobi"),
+        )
+
+        execution = start_execution(
+            work_item=self.work_item,
+            employee=self.employee,
+            started_at=started_at,
+        )
+
+        stop_execution(
+            execution=execution,
+            ended_at=ended_at,
+        )
+
+        execution.refresh_from_db()
+
+        self.assertEqual(
+            execution.ended_at,
+            ended_at,
+        )
+
+        self.assertEqual(
+            execution.duration.total_seconds(),
+            45 * 60,
+        )
+
+    def test_execution_cannot_be_stopped_twice(self):
+        execution = start_execution(
+            work_item=self.work_item,
+            employee=self.employee,
+            started_at=datetime(
+                2026,
+                10,
+                6,
+                8,
+                15,
+                tzinfo=ZoneInfo("Africa/Nairobi"),
+            ),
+        )
+
+        stop_execution(
+            execution=execution,
+            ended_at=datetime(
+                2026,
+                10,
+                6,
+                9,
+                0,
+                tzinfo=ZoneInfo("Africa/Nairobi"),
+            ),
+        )
+
+        with self.assertRaises(ValidationError):
+            stop_execution(
+                execution=execution,
+                ended_at=datetime(
+                    2026,
+                    10,
+                    6,
+                    9,
+                    30,
+                    tzinfo=ZoneInfo("Africa/Nairobi"),
+                ),
+            )
+
+    def test_stop_execution_rejects_end_before_start(self):
+        execution = start_execution(
+            work_item=self.work_item,
+            employee=self.employee,
+            started_at=datetime(
+                2026,
+                10,
+                6,
+                9,
+                0,
+                tzinfo=ZoneInfo("Africa/Nairobi"),
+            ),
+        )
+
+        with self.assertRaises(ValidationError):
+            stop_execution(
+                execution=execution,
+                ended_at=datetime(
+                    2026,
+                    10,
+                    6,
+                    8,
+                    0,
+                    tzinfo=ZoneInfo("Africa/Nairobi"),
+                ),
+            )
