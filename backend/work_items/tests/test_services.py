@@ -4,7 +4,7 @@ from django.core.exceptions import ValidationError
 from django.test import TestCase
 from accounts.models import User
 from companies.models import Company, Department, WorkItem
-from work_items.services import transition_work_item
+from work_items.services import (transition_work_item,start_execution,stop_execution)
 
 
 class WorkItemTransitionTests(TestCase):

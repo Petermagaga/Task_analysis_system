@@ -106,4 +106,56 @@ def start_execution(work_item,employee,started_at=None,notes="",):
                 )
             }
         )
-    
+
+    if started_at is None:
+        started_at=timezone.now()
+
+    execution=WorkExecution(
+        company=work_item.company,
+        work_item=work_item,
+        employee=employee,
+        started_at=started_at,
+        notes=notes,
+    )
+    execution.full_clean()
+    execution.save()
+
+    if work_item.status !="IN_PROGRESS":
+        transition_work_item(
+            work_item,
+            "IN_PROGRESS",
+
+        )
+        return execution
+@transaction.atomic
+def stop_execution(execution,ended_at=None,):
+
+    if execution.ended_at is not None:
+        raise ValidationError(
+            {
+                "ended_at":(
+                    "This execution has already been stopped."
+                )
+            }
+        )
+    if ended_at is None:
+        ended_at=timezone.now()
+
+    if ended_at<execution.started_at:
+        raise ValidationError(
+            {
+                "ended_at":(
+                    "End time cannot be earlier than"
+                    "start time"
+                )
+            }
+        )
+    execution.ended_at=ended_at
+    execution.full_clean()
+    execution.save(
+        update_fields=[
+            "ended_at",
+            "updated_at"
+        ]
+    )
+    return execution
