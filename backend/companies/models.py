@@ -347,7 +347,53 @@ class WorkExecution(models.Model):
         return (
             f"{self.work_item.title} - "
             f"{self.employee}"
-        )        
+        ) 
+
+class Outcome(models.Model):
+    id=models.UUIDField(default=uuid.uuid4,primary_key=True,editable=True)
+    company=models.ForeignKey(Company,on_delete=models.PROTECT,related_name="outcomes")
+    work_item=models.ForeignKey(WorkItem,on_delete=models.PROTECT,related_name="outcomes")
+    employee=models.ForeignKey("accounts.User",on_delete=models.PROTECT,related_name="outcomes")
+    description=models.TextField()
+    is_confirmed=models.BooleanField(default=False)
+    confirmed_at=models.DateTimeField(null=True,blank=True)
+    created_at=models.DateTimeField(auto_now=True)
+    updated_at=models.DateTimeField(auto_now=True)
+
+    def clean(self):
+        errors={}
+
+        if self.company_id and self.work_item_id:
+            if self.work_item.company_id !=self.company_id:
+                errors["company"] =(
+                    "Outcome must belong to the same company"
+                    "as the work item"
+                )
+        if self.company_id and self.employee_id:
+            if self.employee.company_id  != self.company_id:
+                errors["employee"]=(
+                    "Employee must belong to the same company"
+                    "as the outcume"
+                )
+        if self.is_confirmed and not self.confirmed_at:
+            errors["confirmed_at"] =(
+                "Confirmed outcomes must have a confirmation time"
+            )
+
+        if not self.is_confirmed and self.confirmed_at:
+            errors["confirmed_at"]=(
+                "Unconfirmed outcomes cannot have a confirmation time."
+            )
+        if errors:
+            raise ValidationError(errors)
+    def __str__(self):
+        return(
+            f"{self.work_item.title} -"
+            f"{self.employee}"
+        )
+                
+
+
 
 
 
