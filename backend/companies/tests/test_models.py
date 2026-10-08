@@ -982,3 +982,59 @@ class OutcomeModelTests(TestCase):
             second_execution,
             outcome.executions.all(),
         )
+
+
+    def test_execution_can_support_multiple_outcomes(self):
+        execution = WorkExecution.objects.create(
+            company=self.company,
+            work_item=self.work_item,
+            employee=self.employee,
+            started_at=datetime(
+                2026,
+                10,
+                7,
+                8,
+                15,
+                tzinfo=ZoneInfo("Africa/Nairobi"),
+            ),
+            ended_at=datetime(
+                2026,
+                10,
+                7,
+                10,
+                15,
+                tzinfo=ZoneInfo("Africa/Nairobi"),
+            ),
+        )
+
+        first_outcome = Outcome.objects.create(
+            company=self.company,
+            work_item=self.work_item,
+            employee=self.employee,
+            description="Machine repaired.",
+        )
+
+        second_outcome = Outcome.objects.create(
+            company=self.company,
+            work_item=self.work_item,
+            employee=self.employee,
+            description="Machine tested successfully.",
+        )
+
+        first_outcome.executions.add(execution)
+        second_outcome.executions.add(execution)
+
+        self.assertEqual(
+            execution.outcomes.count(),
+            2,
+        )
+
+        self.assertIn(
+            first_outcome,
+            execution.outcomes.all(),
+        )
+
+        self.assertIn(
+            second_outcome,
+            execution.outcomes.all(),
+        )
