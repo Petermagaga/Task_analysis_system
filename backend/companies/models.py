@@ -386,6 +386,8 @@ class Outcome(models.Model):
         blank=True,
     )
 
+    executions=models.ManyToManyField(WorkExecution,related_name="outcomes",blank=True)
+
     created_at = models.DateTimeField(
         auto_now_add=True,
     )

@@ -910,3 +910,75 @@ class OutcomeModelTests(TestCase):
             str(outcome),
             "Repair stitching machine - Test Employee",
         )
+
+    def test_outcome_can_have_multiple_executions(self):
+        first_execution = WorkExecution.objects.create(
+            company=self.company,
+            work_item=self.work_item,
+            employee=self.employee,
+            started_at=datetime(
+                2026,
+                10,
+                7,
+                8,
+                15,
+                tzinfo=ZoneInfo("Africa/Nairobi"),
+            ),
+            ended_at=datetime(
+                2026,
+                10,
+                7,
+                9,
+                0,
+                tzinfo=ZoneInfo("Africa/Nairobi"),
+            ),
+        )
+
+        second_execution = WorkExecution.objects.create(
+            company=self.company,
+            work_item=self.work_item,
+            employee=self.employee,
+            started_at=datetime(
+                2026,
+                10,
+                7,
+                14,
+                0,
+                tzinfo=ZoneInfo("Africa/Nairobi"),
+            ),
+            ended_at=datetime(
+                2026,
+                10,
+                7,
+                14,
+                45,
+                tzinfo=ZoneInfo("Africa/Nairobi"),
+            ),
+        )
+
+        outcome = Outcome.objects.create(
+            company=self.company,
+            work_item=self.work_item,
+            employee=self.employee,
+            description="Machine repaired successfully.",
+        )
+
+        outcome.executions.add(
+            first_execution,
+            second_execution,
+        )
+
+        self.assertEqual(
+            outcome.executions.count(),
+            2,
+        )
+
+        self.assertIn(
+            first_execution,
+            outcome.executions.all(),
+        )
+
+        self.assertIn(
+            second_execution,
+            outcome.executions.all(),
+        )
