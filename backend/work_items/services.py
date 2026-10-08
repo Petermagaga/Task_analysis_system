@@ -190,3 +190,29 @@ def create_outcome(work_item,employee,description,):
     outcome.save()
 
     return outcome
+
+
+@transaction.atomic
+def confirm_outcome(outcome,confirmed_at=None,):
+    if outcome.is_confirmed:
+        raise ValidationError(
+            {
+                "is_confirmed":("This outcome has already been confirmed.")
+            }
+        )
+    if confirmed_at is None:
+        confirmed_at=timezone.now()
+
+    outcome.is_confirmed=True
+    outcome.confirmed_at=confirmed_at
+
+    outcome.full_clean()
+
+    outcome.save(
+        update_fields=[
+            "is_confirmed",
+            "confirmed_at",
+            "updated_at",
+        ]
+    )
+    return outcome
