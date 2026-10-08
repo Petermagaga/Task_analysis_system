@@ -2,7 +2,7 @@ from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.utils import timezone
 
-from companies.models import WorkExecution
+from companies.models import WorkExecution,Outcome
 
 STATUS_TRANSITIONS = {
     "DRAFT": {
@@ -159,3 +159,34 @@ def stop_execution(execution,ended_at=None,):
         ]
     )
     return execution
+
+@transaction.atomic
+def create_outcome(work_item,employee,description,):
+    if work_item.company_id !=employee.company_id:
+        raise ValidationError(
+            {
+                "employee":(
+                    "Employee must belong to the same company "
+                    "as the work item."
+                )
+            }
+        )
+    if not description or not description.strip():
+        raise ValidationError(
+            {
+                "Description":(
+                    "Outcome description cannot be empty."
+                )
+            }
+        )
+    outcome=Outcome(
+        company=work_item.company,
+        work_item=work_item,
+        employee=employee,
+        description=description.strip(),
+    )
+
+    outcome.full_clean()
+    outcome.save()
+
+    return outcome
