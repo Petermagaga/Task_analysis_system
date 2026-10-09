@@ -3,11 +3,11 @@ from zoneinfo import ZoneInfo
 from django.core.exceptions import ValidationError
 from django.test import TestCase
 from accounts.models import User
-from companies.models import Company, Department, WorkItem
+from companies.models import Company, Department, WorkItem,Outcome
 from work_items.services import (transition_work_item,
                                  start_execution,
                                  stop_execution,confirm_outcome,
-                                 create_outcome,attach_execution_to_outcome)
+                                 create_outcome,attach_execution_to_outcome,WorkExecution)
 
 
 class WorkItemTransitionTests(TestCase):
