@@ -219,12 +219,26 @@ def confirm_outcome(outcome,confirmed_at=None,):
 
 
 @transaction.atomic
-def attach_execution_to_outcome(outcome,execution,):
-    if outcome.company_id!= execution.company_id:
+def attach_execution_to_outcome(outcome,execution):
+    if outcome.company_id != execution.company_id:
         raise ValidationError(
+
             {
                 "execution":(
-                    
+                    "Execution must belong to the same "
+                    "company as the outcome"
                 )
             }
         )
+    if outcome.work_item_id != execution.work_item_id:
+        raise ValidationError(
+            {
+                "execution":(
+                    "execution must belong to same "
+                    "work item as the outcome"
+                )
+            }
+        )
+    outcome.executions.add(execution)
+
+    return outcome

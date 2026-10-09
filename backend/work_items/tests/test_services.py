@@ -4,7 +4,10 @@ from django.core.exceptions import ValidationError
 from django.test import TestCase
 from accounts.models import User
 from companies.models import Company, Department, WorkItem
-from work_items.services import (transition_work_item,start_execution,stop_execution,confirm_outcome,create_outcome,)
+from work_items.services import (transition_work_item,
+                                 start_execution,
+                                 stop_execution,confirm_outcome,
+                                 create_outcome,attach_execution_to_outcome)
 
 
 class WorkItemTransitionTests(TestCase):
@@ -583,4 +586,231 @@ class OutcomeServiceTests(TestCase):
         self.assertEqual(
             self.work_item.status,
             WorkItem.Status.IN_PROGRESS,
+        )
+
+class OutcomeExecutionAssociationTests(TestCase):
+
+    def setUp(self):
+        self.company = Company.objects.create(
+            name="Test Company",
+            code="TEST",
+        )
+
+        self.department = Department.objects.create(
+            company=self.company,
+            name="Production",
+            code="PROD",
+        )
+
+        self.employee = User.objects.create_user(
+            username="employee",
+            email="employee@test.com",
+            password="TestPassword123!",
+            company=self.company,
+            department=self.department,
+            role=User.Role.EMPLOYEE,
+            first_name="Test",
+            last_name="Employee",
+        )
+
+        self.work_item = WorkItem.objects.create(
+            company=self.company,
+            department=self.department,
+            owner=self.employee,
+            title="Repair stitching machine",
+            planned_at=datetime(
+                2026,
+                10,
+                8,
+                8,
+                0,
+                tzinfo=ZoneInfo("Africa/Nairobi"),
+            ),
+            status=WorkItem.Status.IN_PROGRESS,
+        )
+
+        self.execution = WorkExecution.objects.create(
+            company=self.company,
+            work_item=self.work_item,
+            employee=self.employee,
+            started_at=datetime(
+                2026,
+                10,
+                8,
+                8,
+                15,
+                tzinfo=ZoneInfo("Africa/Nairobi"),
+            ),
+            ended_at=datetime(
+                2026,
+                10,
+                8,
+                9,
+                0,
+                tzinfo=ZoneInfo("Africa/Nairobi"),
+            ),
+        )
+
+        self.outcome = Outcome.objects.create(
+            company=self.company,
+            work_item=self.work_item,
+            employee=self.employee,
+            description="Machine repaired successfully.",
+        )
+
+    def test_execution_can_be_attached_to_outcome(self):
+        attach_execution_to_outcome(
+            outcome=self.outcome,
+            execution=self.execution,
+        )
+
+        self.assertIn(
+            self.execution,
+            self.outcome.executions.all(),
+        )
+
+    def test_execution_can_be_attached_only_once(self):
+        attach_execution_to_outcome(
+            outcome=self.outcome,
+            execution=self.execution,
+        )
+
+        attach_execution_to_outcome(
+            outcome=self.outcome,
+            execution=self.execution,
+        )
+
+        self.assertEqual(
+            self.outcome.executions.count(),
+            1,
+        )
+
+    def test_execution_from_another_company_is_rejected(self):
+        other_company = Company.objects.create(
+            name="Other Company",
+            code="OTHER",
+        )
+
+        other_department = Department.objects.create(
+            company=other_company,
+            name="Operations",
+            code="OPS",
+        )
+
+        other_employee = User.objects.create_user(
+            username="other_employee",
+            email="other@test.com",
+            password="TestPassword123!",
+            company=other_company,
+            department=other_department,
+            role=User.Role.EMPLOYEE,
+        )
+
+        other_work_item = WorkItem.objects.create(
+            company=other_company,
+            department=other_department,
+            owner=other_employee,
+            title="Other work",
+            planned_at=datetime(
+                2026,
+                10,
+                8,
+                8,
+                0,
+                tzinfo=ZoneInfo("Africa/Nairobi"),
+            ),
+        )
+
+        other_execution = WorkExecution.objects.create(
+            company=other_company,
+            work_item=other_work_item,
+            employee=other_employee,
+            started_at=datetime(
+                2026,
+                10,
+                8,
+                8,
+                15,
+                tzinfo=ZoneInfo("Africa/Nairobi"),
+            ),
+        )
+
+        with self.assertRaises(ValidationError):
+            attach_execution_to_outcome(
+                outcome=self.outcome,
+                execution=other_execution,
+            )
+
+    def test_execution_from_another_work_item_is_rejected(self):
+        other_work_item = WorkItem.objects.create(
+            company=self.company,
+            department=self.department,
+            owner=self.employee,
+            title="Prepare production report",
+            planned_at=datetime(
+                2026,
+                10,
+                8,
+                10,
+                0,
+                tzinfo=ZoneInfo("Africa/Nairobi"),
+            ),
+        )
+
+        other_execution = WorkExecution.objects.create(
+            company=self.company,
+            work_item=other_work_item,
+            employee=self.employee,
+            started_at=datetime(
+                2026,
+                10,
+                8,
+                10,
+                15,
+                tzinfo=ZoneInfo("Africa/Nairobi"),
+            ),
+        )
+
+        with self.assertRaises(ValidationError):
+            attach_execution_to_outcome(
+                outcome=self.outcome,
+                execution=other_execution,
+            )
+
+    def test_multiple_executions_can_be_attached_to_same_outcome(self):
+        second_execution = WorkExecution.objects.create(
+            company=self.company,
+            work_item=self.work_item,
+            employee=self.employee,
+            started_at=datetime(
+                2026,
+                10,
+                8,
+                14,
+                0,
+                tzinfo=ZoneInfo("Africa/Nairobi"),
+            ),
+            ended_at=datetime(
+                2026,
+                10,
+                8,
+                14,
+                45,
+                tzinfo=ZoneInfo("Africa/Nairobi"),
+            ),
+        )
+
+        attach_execution_to_outcome(
+            outcome=self.outcome,
+            execution=self.execution,
+        )
+
+        attach_execution_to_outcome(
+            outcome=self.outcome,
+            execution=second_execution,
+        )
+
+        self.assertEqual(
+            self.outcome.executions.count(),
+            2,
         )
