@@ -74,6 +74,23 @@ def transition_work_item(work_item, new_status):
                 )
             }
         )
+    if new_status =="COMPLETED":
+        has_confirmed_outcome=(
+            work_item.outcomes.filter(
+
+            ).exists(
+
+            )
+        )
+        if not has_confirmed_outcome:
+            raise ValidationError(
+                {
+                    "status":(
+                        "A Work item cannot be completed"
+                        "without at least one confirmed outcome."
+                    )
+                }
+            )
 
     work_item.status = new_status
     work_item.save(update_fields=["status", "updated_at"])
@@ -126,7 +143,7 @@ def start_execution(work_item,employee,started_at=None,notes="",):
             "IN_PROGRESS",
 
         )
-        return execution
+    return execution
 @transaction.atomic
 def stop_execution(execution,ended_at=None,):
 
