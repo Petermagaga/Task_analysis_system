@@ -507,6 +507,29 @@ class WorkExecutionServiceTests(TestCase):
             )
 
 
+    def test_start_execution_returns_execution_when_already_in_progress(self):
+        first_execution = start_execution(
+            work_item=self.work_item,
+            employee=self.employee,
+        )
+
+        second_execution = start_execution(
+            work_item=self.work_item,
+            employee=self.employee,
+        )
+
+        self.assertIsNotNone(second_execution)
+        self.assertNotEqual(
+            first_execution.id,
+            second_execution.id,
+        )
+        self.assertEqual(
+            second_execution.work_item,
+            self.work_item,
+        )
+
+
+
 class OutcomeServiceTests(TestCase):
 
     def setUp(self):
