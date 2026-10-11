@@ -100,33 +100,126 @@ class WorkItemTransitionTests(TestCase):
                 WorkItem.Status.COMPLETED,
             )
 
-    def test_completed_can_be_reviewed(self):
+
+
+    def test_in_progress_cannot_be_completed_without_outcome(self):
         transition_work_item(
             self.work_item,
             WorkItem.Status.PLANNED,
         )
-
         transition_work_item(
             self.work_item,
             WorkItem.Status.IN_PROGRESS,
         )
+
+        with self.assertRaises(ValidationError):
+            transition_work_item(
+                self.work_item,
+                WorkItem.Status.COMPLETED,
+            )
+
+        self.work_item.refresh_from_db()
+        self.assertEqual(
+            self.work_item.status,
+            WorkItem.Status.IN_PROGRESS,
+        )
+
+    def test_in_progress_cannot_be_completed_with_unconfirmed_outcome(self):
+        transition_work_item(
+            self.work_item,
+            WorkItem.Status.PLANNED,
+        )
+        transition_work_item(
+            self.work_item,
+            WorkItem.Status.IN_PROGRESS,
+        )
+
+        create_outcome(
+            self.work_item,
+            self.user,
+            "Machine repair reported by employee.",
+        )
+
+        with self.assertRaises(ValidationError):
+            transition_work_item(
+                self.work_item,
+                WorkItem.Status.COMPLETED,
+            )
+
+        self.work_item.refresh_from_db()
+        self.assertEqual(
+            self.work_item.status,
+            WorkItem.Status.IN_PROGRESS,
+        )
+
+
+
+    def test_in_progress_can_be_completed_with_confirmed_outcome(self):
+        transition_work_item(
+            self.work_item,
+            WorkItem.Status.PLANNED,
+        )
+        transition_work_item(
+            self.work_item,
+            WorkItem.Status.IN_PROGRESS,
+        )
+
+        outcome = create_outcome(
+            self.work_item,
+            self.user,
+            "Stitching machine repaired and tested.",
+        )
+        confirm_outcome(outcome)
 
         transition_work_item(
             self.work_item,
             WorkItem.Status.COMPLETED,
         )
 
-        transition_work_item(
-            self.work_item,
-            WorkItem.Status.REVIEWED,
-        )
-
         self.work_item.refresh_from_db()
-
         self.assertEqual(
             self.work_item.status,
-            WorkItem.Status.REVIEWED,
+            WorkItem.Status.COMPLETED,
         )
+
+    def test_completed_can_be_reviewed(self):
+            transition_work_item(
+                self.work_item,
+                WorkItem.Status.PLANNED,
+            )
+
+            transition_work_item(
+                self.work_item,
+                WorkItem.Status.IN_PROGRESS,
+            )
+
+            # 1. Create an outcome
+            outcome = create_outcome(
+                self.work_item,
+                self.user,
+                "Finished repairing the machine.",
+            )
+
+            # 2. Confirm the outcome to satisfy the completion rule
+            confirm_outcome(outcome)
+
+            # 3. Now completion is allowed
+            transition_work_item(
+                self.work_item,
+                WorkItem.Status.COMPLETED,
+            )
+
+            transition_work_item(
+                self.work_item,
+                WorkItem.Status.REVIEWED,
+            )
+
+            self.work_item.refresh_from_db()
+
+            self.assertEqual(
+                self.work_item.status,
+                WorkItem.Status.REVIEWED,
+            )
 
     def test_reviewed_can_be_archived(self):
         transition_work_item(
@@ -139,6 +232,14 @@ class WorkItemTransitionTests(TestCase):
             WorkItem.Status.IN_PROGRESS,
         )
 
+        # 1. Create and confirm an outcome for completion
+        outcome = create_outcome(
+            self.work_item,
+            self.user,
+            "Successfully completed maintenance task.",
+        )
+        confirm_outcome(outcome)
+
         transition_work_item(
             self.work_item,
             WorkItem.Status.COMPLETED,
@@ -160,6 +261,7 @@ class WorkItemTransitionTests(TestCase):
             self.work_item.status,
             WorkItem.Status.ARCHIVED,
         )
+
 
     def test_archived_work_cannot_change(self):
         transition_work_item(
