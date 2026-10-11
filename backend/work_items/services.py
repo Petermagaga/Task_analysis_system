@@ -57,6 +57,7 @@ STATUS_TRANSITIONS = {
 }
 
 
+@transaction.atomic
 def transition_work_item(work_item, new_status):
     current_status = work_item.status
 
@@ -65,6 +66,7 @@ def transition_work_item(work_item, new_status):
         set(),
     )
 
+    # Step 1: Validate the requested transition.
     if new_status not in allowed_statuses:
         raise ValidationError(
             {
@@ -74,26 +76,30 @@ def transition_work_item(work_item, new_status):
                 )
             }
         )
-    if new_status =="COMPLETED":
-        has_confirmed_outcome=(
+
+    # Step 2: Require a confirmed outcome before completion.
+    if new_status == "COMPLETED":
+        has_confirmed_outcome = (
             work_item.outcomes.filter(
-
-            ).exists(
-
-            )
+                is_confirmed=True,
+            ).exists()
         )
+
         if not has_confirmed_outcome:
             raise ValidationError(
                 {
-                    "status":(
-                        "A Work item cannot be completed"
+                    "status": (
+                        "A work item cannot be completed "
                         "without at least one confirmed outcome."
                     )
                 }
             )
 
+    # Step 3: Save only after validation succeeds.
     work_item.status = new_status
-    work_item.save(update_fields=["status", "updated_at"])
+    work_item.save(
+        update_fields=["status", "updated_at"]
+    )
 
     return work_item
 
