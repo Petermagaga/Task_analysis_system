@@ -46,3 +46,5 @@ class WorkItemListCreateAPIView(generics.ListCreateAPIView):
 
 password="UniquePassword123!"
 
+password2="ReplaceWithYourOwnStrongTestPassword!"
+
