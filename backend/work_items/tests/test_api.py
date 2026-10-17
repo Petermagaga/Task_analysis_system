@@ -121,9 +121,8 @@ class WorkItemAPITests(APITestCase):
 
         response = self.client.get(self.url)
 
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data["Count"], 0)
-        self.assertEqual(response.data["value"], [])
+        self.assertEqual(response.status_code, status.HTTP_200_OK,)
+        self.assertEqual(response.data, [])
 
     def test_employee_cannot_create_work_for_another_department(self):
         response = self.client.post(
