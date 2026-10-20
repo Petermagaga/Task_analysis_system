@@ -2,7 +2,7 @@
 from rest_framework import serializers
 
 from companies.models import WorkItem
-
+from 
 
 class WorkItemSerializer(serializers.ModelSerializer):
     class Meta:
