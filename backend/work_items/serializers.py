@@ -1,8 +1,8 @@
 
 from rest_framework import serializers
 
-from companies.models import WorkItem
-from 
+from companies.models import WorkItem,WorkExecution
+
 
 class WorkItemSerializer(serializers.ModelSerializer):
     class Meta:
@@ -74,3 +74,36 @@ class WorkItemSerializer(serializers.ModelSerializer):
             })
 
         return attrs
+
+class WorkExecutionSerializer(serializers.ModelSerializer):
+    duration_seconds=serializers.SerializerMethodField()
+
+    class Meta:
+        model=WorkExecution
+        fields=[
+            'id',
+            "work_item",
+            "employee",
+            "started_at",
+            "ended_at",
+            "notes",
+            "duration_seconds",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields=[
+            "id",
+            "work_item",
+            "employee",
+            "started_at",
+            "ended_at",
+            "duration_seconds",
+            "created_at",
+            "updated_at",
+        ]
+    def get_duration_seconds(self,obj):
+        duration=obj.duration
+        if duration is None:
+            return None
+
+        return int(duration.total_seconds())
