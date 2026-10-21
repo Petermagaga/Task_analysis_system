@@ -130,5 +130,9 @@ class OutcomeSerializer(serializers.ModelSerializer):
             "id",
             "work_item",
             "employee",
-            "is"
+            "is_confirmed",
+            "confirmed_at",
+            "executions",
+            "created_at",
+            "updated_at",
         ]

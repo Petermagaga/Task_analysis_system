@@ -6,9 +6,9 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from companies.models import WorkItem,WorkExecution
-from .serializers import WorkItemSerializer,WorkExecutionSerializer
-from .services import transition_work_item,start_execution,stop_execution
+from companies.models import WorkItem,WorkExecution,Outcome
+from .serializers import WorkItemSerializer,WorkExecutionSerializer,OutcomeSerializer
+from .services import transition_work_item,start_execution,stop_execution,create_outcome,confirm_outcome
 
 class WorkItemListCreateAPIView(generics.ListCreateAPIView):
     serializer_class = WorkItemSerializer
