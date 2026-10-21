@@ -6,9 +6,9 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from companies.models import WorkItem
-from .serializers import WorkItemSerializer
-from .services import transition_work_item
+from companies.models import WorkItem,WorkExecution
+from .serializers import WorkItemSerializer,WorkExecutionSerializer
+from .services import transition_work_item,start_execution,stop_execution
 
 class WorkItemListCreateAPIView(generics.ListCreateAPIView):
     serializer_class = WorkItemSerializer
@@ -101,4 +101,76 @@ class WorkItemTransitionAPIView(APIView):
         status=status.HTTP_200_OK,
         )
 
+
+
+class WorkExecutionStartAPIView(APIView):
+    permission_classes=[IsAuthenticated]
+
+    def post(self,request,work_item_id):
+        user=request.user
+
+        queryset=WorkItem.objects.filter(
+            company_id=user.company_id,
+        )
+
+        if user.role =="EMPLOYEE":
+            queryset=queryset.filter(owner=user)
+        elif user.role =="SUPERVISOR":
+            queryset=queryset.filter(department_id=user.department_id,)
+
+        work_item=get_object_or_404(queryset,id=work_item_id)
+
+        notes=request.data.get("notes","")
+
+        if not isinstance(notes,str):
+            raise serializers.ValidationError({"notes":"Notes must be text."})
+        try:
+            execution=start_execution(
+                work_item=work_item,
+                employee=user,
+                notes=notes,
+            )
+        except DjangoValidationError as exc:
+            detail=(
+                exc.message_dict
+                if hasattr(exc,"message_dict")
+                else exc.messages
+            )
+
+            raise serializers.ValidationError(detail) from exc
+
+        return Response(
+            WorkExecutionSerializer(execution).data,
+            status=status.HTTP_201_CREATED
+        )
+
+
+class WorkExecutionStopAPIView(APIView):
+    permission_classes=[IsAuthenticated]
     
+    def post(self,request,execution_id):
+        user=request.user
+        queryset=WorkExecution.objects.filter(company_id=user.company_id,)
+
+        if user.role=="EMPLOYEE":
+            queryset=queryset.filter(employee=user)
+        elif user.role=="SUPERVISOR":
+            queryset=queryset.filter(work_item__department_id=user.department_id,)
+
+        execution =get_object_or_404(queryset, id=execution_id)
+
+        try:
+            execution=stop_execution(execution)
+
+        except DjangoValidationError as exc:
+            detail=(
+                exc.message_dict
+                if hasattr(exc,"message_dict")
+                           else exc.messages
+            )
+            raise serializers.ValidationError(detail) from exc
+
+        return Response(
+            WorkExecutionSerializer(execution).data,
+            status=status.HTTP_200_OK,
+        )
