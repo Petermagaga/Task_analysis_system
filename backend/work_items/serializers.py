@@ -1,7 +1,7 @@
 
 from rest_framework import serializers
 
-from companies.models import WorkItem,WorkExecution
+from companies.models import WorkItem,WorkExecution,Outcome
 
 
 class WorkItemSerializer(serializers.ModelSerializer):
@@ -107,3 +107,28 @@ class WorkExecutionSerializer(serializers.ModelSerializer):
             return None
 
         return int(duration.total_seconds())
+
+
+class OutcomeSerializer(serializers.ModelSerializer):
+    executions=serializers.PrimaryKeyRelatedField(
+        many=True,read_only=True,)
+
+    class Meta:
+        model=Outcome
+        fields=[
+            "id",
+            "work_item",
+            "employee",
+            "description",
+            "is_confirmed",
+            "confirmed_at",
+            "executions",
+            "created_at",
+        ]
+
+        read_only_fields =[
+            "id",
+            "work_item",
+            "employee",
+            "is"
+        ]
