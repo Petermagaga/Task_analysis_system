@@ -8,7 +8,7 @@ from rest_framework.views import APIView
 
 from companies.models import WorkItem,WorkExecution,Outcome
 from .serializers import WorkItemSerializer,WorkExecutionSerializer,OutcomeSerializer
-from .services import transition_work_item,start_execution,stop_execution,create_outcome,confirm_outcome
+from .services import (transition_work_item,start_execution,stop_execution,create_outcome,confirm_outcome)
 
 class WorkItemListCreateAPIView(generics.ListCreateAPIView):
     serializer_class = WorkItemSerializer
@@ -174,3 +174,50 @@ class WorkExecutionStopAPIView(APIView):
             WorkExecutionSerializer(execution).data,
             status=status.HTTP_200_OK,
         )
+
+class WorkItemOutcomeCreateAPIView(APIView):
+    permission_classes =[IsAuthenticated]
+
+    def post(self,request,work_item_id):
+        user=request.user
+
+        #Employees may record outcomes only for their own work
+
+        work_item=get_object_or_404(
+            WorkItem.objects.filter(
+                company_id=user.company_id,
+                owner=user,
+            ),
+            id=work_item_id,
+        )
+
+        description=request.data.get("description","")
+
+        if not isinstance(description,str):
+            raise serializers.ValidationError(
+                {
+                    "description":"Description must be text"
+                }
+            )
+        try:
+            outcome=create_outcome(
+                work_item=work_item,
+                employee=user,
+                description=description
+            )
+
+        except DjangoValidationError as exc:
+            detail=(
+                exc.message_dict
+                if hasattr(exc,"message_dict")
+                else exc.messages
+            )
+            raise serializers.ValidationError(detail) from exc
+
+        return Response(
+            OutcomeSerializer(outcome).data,
+            status=status.HTTP_201_CREATED,
+        )
+
+
+    
