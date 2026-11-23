@@ -8,7 +8,12 @@ from rest_framework.views import APIView
 
 from companies.models import WorkItem,WorkExecution,Outcome
 from .serializers import WorkItemSerializer,WorkExecutionSerializer,OutcomeSerializer
-from .services import (transition_work_item,start_execution,stop_execution,create_outcome,confirm_outcome)
+from .services import (transition_work_item,
+                       start_execution,
+                       stop_execution,
+                       create_outcome,
+                       confirm_outcome,
+                       attach_execution_to_outcome)
 
 class WorkItemListCreateAPIView(generics.ListCreateAPIView):
     serializer_class = WorkItemSerializer
@@ -46,11 +51,6 @@ class WorkItemListCreateAPIView(generics.ListCreateAPIView):
             status=WorkItem.Status.DRAFT,
         )
 
-
-
-password="UniquePassword123!"
-
-password2="ReplaceWithYourOwnStrongTestPassword!"
 
 class WorkItemTransitionAPIView(APIView):
     permission_classes =[IsAuthenticated]
@@ -250,5 +250,54 @@ class OutcomeConfirmAPIView(APIView):
             status=status.HTTP_200_OK,
         )
 
+class OutcomeExecutionAssociationAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, outcome_id):
+
+        user = request.user
+
+        outcome = get_object_or_404(
+            Outcome.objects.filter(
+                company_id=user.company_id,
+                employee=user,
+            ),
+            id=outcome_id,
+        )
+
+        execution_id = request.data.get("execution_id")
+
+        if not execution_id:
+            raise serializers.ValidationError({
+                "execution_id": "Execution ID is required."
+            })
+
+        execution = get_object_or_404(
+            WorkExecution.objects.filter(
+                company_id=user.company_id,
+                employee=user,
+            ),
+            id=execution_id,
+        )
+
+        try:
+            outcome = attach_execution_to_outcome(
+                outcome=outcome,
+                execution=execution,
+            )
+
+        except DjangoValidationError as exc:
+            detail = (
+                exc.message_dict
+                if hasattr(exc, "message_dict")
+                else exc.messages
+            )
+
+            raise serializers.ValidationError(detail) from exc
+
+        return Response(
+            OutcomeSerializer(outcome).data,
+            status=status.HTTP_200_OK,
+        )
     
     

@@ -7,7 +7,7 @@ from rest_framework.test import APITestCase
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from accounts.models import User
-from companies.models import Company, Department, WorkItem
+from companies.models import Company, Department, WorkItem,WorkExecution,Outcome
 
 
 class WorkItemAPITests(APITestCase):
@@ -76,6 +76,91 @@ class WorkItemAPITests(APITestCase):
         }
         payload.update(overrides)
         return payload
+
+    def create_test_work_item(self, **overrides):
+        data = {
+            "company": self.company,
+            "department": self.department,
+            "owner": self.employee,
+            "title": "Test work item",
+            "work_type": "TASK",
+            "planned_at": timezone.now() + timedelta(days=1),
+        }
+        data.update(overrides)
+        return WorkItem.objects.create(**data)
+
+    def create_test_outcome(self, work_item):
+        return Outcome.objects.create(
+            company=self.company,
+            work_item=work_item,
+            employee=self.employee,
+            description="Completed the assigned inspection.",
+        )
+
+    def create_test_execution(
+        self,
+        work_item,
+        employee=None,
+        ended=True,
+    ):
+        started_at = timezone.now() - timedelta(minutes=10)
+
+        return WorkExecution.objects.create(
+            company=work_item.company,
+            work_item=work_item,
+            employee=employee or self.employee,
+            started_at=started_at,
+            ended_at=timezone.now() if ended else None,
+            notes="Test execution",
+        )
+
+    def create_other_company_records(self):
+        other_company = Company.objects.create(
+            name="Other Test Company",
+            code="OTHERTEST",
+        )
+
+        other_department = Department.objects.create(
+            company=other_company,
+            name="Operations",
+            code="OTHEROPS",
+        )
+
+        other_employee = User.objects.create_user(
+            username="other_company_employee",
+            email="other_company_employee@example.com",
+            password="Other-Test-Password-789!",
+            company=other_company,
+            department=other_department,
+            role="EMPLOYEE",
+        )
+
+        other_work_item = WorkItem.objects.create(
+            company=other_company,
+            department=other_department,
+            owner=other_employee,
+            title="Other company task",
+            work_type="TASK",
+            planned_at=timezone.now() + timedelta(days=1),
+        )
+
+        other_outcome = Outcome.objects.create(
+            company=other_company,
+            work_item=other_work_item,
+            employee=other_employee,
+            description="Other company's completed work.",
+        )
+
+        other_execution = WorkExecution.objects.create(
+            company=other_company,
+            work_item=other_work_item,
+            employee=other_employee,
+            started_at=timezone.now() - timedelta(minutes=10),
+            ended_at=timezone.now(),
+            notes="Other company's execution",
+        )
+
+        return other_outcome, other_execution
 
     def test_unauthenticated_user_cannot_list_work_items(self):
         self.client.credentials()
@@ -185,3 +270,177 @@ class WorkItemAPITests(APITestCase):
             status.HTTP_400_BAD_REQUEST,
         )
         self.assertIn("due_at", response.data)
+
+    def test_employee_can_attach_execution_to_outcome(self):
+        work_item = self.create_test_work_item()
+        outcome = self.create_test_outcome(work_item)
+        execution = self.create_test_execution(work_item)
+
+        url = f"/api/work-items/outcomes/{outcome.id}/executions/"
+
+        response = self.client.post(
+            url,
+            {"execution_id": str(execution.id)},
+            format="json",
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_200_OK,
+            response.data,
+        )
+
+        outcome.refresh_from_db()
+
+        self.assertTrue(
+            outcome.executions.filter(id=execution.id).exists()
+        )
+
+    def test_employee_cannot_attach_execution_from_another_work_item(self):
+        work_item = self.create_test_work_item()
+        another_work_item = self.create_test_work_item(
+            title="Another work item"
+        )
+
+        outcome = self.create_test_outcome(work_item)
+        execution = self.create_test_execution(another_work_item)
+
+        url = f"/api/work-items/outcomes/{outcome.id}/executions/"
+
+        response = self.client.post(
+            url,
+            {"execution_id": str(execution.id)},
+            format="json",
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_400_BAD_REQUEST,
+            response.data,
+        )
+
+    def test_employee_cannot_attach_another_employees_execution(self):
+        work_item = self.create_test_work_item()
+        outcome = self.create_test_outcome(work_item)
+
+        execution = self.create_test_execution(
+            work_item,
+            employee=self.other_employee,
+        )
+
+        url = f"/api/work-items/outcomes/{outcome.id}/executions/"
+
+        response = self.client.post(
+            url,
+            {"execution_id": str(execution.id)},
+            format="json",
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_404_NOT_FOUND,
+            response.data,
+        )
+
+    def test_employee_cannot_attach_an_open_execution(self):
+        work_item = self.create_test_work_item()
+        outcome = self.create_test_outcome(work_item)
+
+        execution = self.create_test_execution(
+            work_item,
+            ended=False,
+        )
+
+        url = f"/api/work-items/outcomes/{outcome.id}/executions/"
+
+        response = self.client.post(
+            url,
+            {"execution_id": str(execution.id)},
+            format="json",
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_400_BAD_REQUEST,
+            response.data,
+        )
+
+    def test_attaching_same_execution_twice_does_not_duplicate_it(self):
+        work_item = self.create_test_work_item()
+        outcome = self.create_test_outcome(work_item)
+        execution = self.create_test_execution(work_item)
+
+        url = f"/api/work-items/outcomes/{outcome.id}/executions/"
+
+        payload = {"execution_id": str(execution.id)}
+
+        first_response = self.client.post(
+            url,
+            payload,
+            format="json",
+        )
+
+        second_response = self.client.post(
+            url,
+            payload,
+            format="json",
+        )
+
+        self.assertEqual(
+            first_response.status_code,
+            status.HTTP_200_OK,
+        )
+
+        self.assertEqual(
+            second_response.status_code,
+            status.HTTP_200_OK,
+        )
+
+        self.assertEqual(outcome.executions.count(), 1)
+
+
+
+    def test_employee_cannot_access_another_company_outcome(self):
+        other_outcome, other_execution = (
+            self.create_other_company_records()
+        )
+
+        url = (
+            f"/api/work-items/outcomes/"
+            f"{other_outcome.id}/executions/"
+        )
+
+        response = self.client.post(
+            url,
+            {"execution_id": str(other_execution.id)},
+            format="json",
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_404_NOT_FOUND,
+        )
+
+    def test_employee_cannot_attach_another_company_execution(self):
+        other_outcome, other_execution = (
+            self.create_other_company_records()
+        )
+
+        own_work_item = self.create_test_work_item()
+        own_outcome = self.create_test_outcome(own_work_item)
+
+        url = (
+            f"/api/work-items/outcomes/"
+            f"{own_outcome.id}/executions/"
+        )
+
+        response = self.client.post(
+            url,
+            {"execution_id": str(other_execution.id)},
+            format="json",
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_404_NOT_FOUND,
+        )

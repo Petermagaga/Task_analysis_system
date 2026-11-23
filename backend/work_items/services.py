@@ -57,6 +57,7 @@ STATUS_TRANSITIONS = {
 }
 
 
+
 @transaction.atomic
 def transition_work_item(work_item, new_status):
     current_status = work_item.status
@@ -95,7 +96,24 @@ def transition_work_item(work_item, new_status):
                 }
             )
 
-    # Step 3: Save only after validation succeeds.
+        # Step 3: Reject completion if an execution is still active.
+        has_active_execution = WorkExecution.objects.filter(
+            work_item=work_item,
+            ended_at__isnull=True,
+        ).exists()
+
+        if has_active_execution:
+            raise ValidationError(
+                {
+                    "status": (
+                        "A work item cannot be completed while "
+                        "an execution is still active. "
+                        "Stop all executions first."
+                    )
+                }
+            )
+
+    # Step 4: Save only after all validations succeed.
     work_item.status = new_status
     work_item.save(
         update_fields=["status", "updated_at"]
@@ -242,26 +260,40 @@ def confirm_outcome(outcome,confirmed_at=None,):
 
 
 @transaction.atomic
-def attach_execution_to_outcome(outcome,execution):
-    if outcome.company_id != execution.company_id:
-        raise ValidationError(
+def attach_execution_to_outcome(outcome, execution):
 
-            {
-                "execution":(
-                    "Execution must belong to the same "
-                    "company as the outcome"
-                )
-            }
-        )
+    if outcome.company_id != execution.company_id:
+        raise ValidationError({
+            "execution": (
+                "Execution must belong to the same "
+                "company as the outcome."
+            )
+        })
+
     if outcome.work_item_id != execution.work_item_id:
-        raise ValidationError(
-            {
-                "execution":(
-                    "execution must belong to same "
-                    "work item as the outcome"
-                )
-            }
-        )
+        raise ValidationError({
+            "execution": (
+                "Execution must belong to the same "
+                "work item as the outcome."
+            )
+        })
+
+    if outcome.employee_id != execution.employee_id:
+        raise ValidationError({
+            "execution": (
+                "Execution and outcome must belong "
+                "to the same employee."
+            )
+        })
+
+    if execution.ended_at is None:
+        raise ValidationError({
+            "execution": (
+                "An execution must be stopped before "
+                "it can be attached to an outcome."
+            )
+        })
+
     outcome.executions.add(execution)
 
     return outcome
