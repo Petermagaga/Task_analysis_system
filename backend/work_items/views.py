@@ -219,5 +219,36 @@ class WorkItemOutcomeCreateAPIView(APIView):
             status=status.HTTP_201_CREATED,
         )
 
+class OutcomeConfirmAPIView(APIView):
+    permission_classes=[IsAuthenticated]
 
+    def post(self,request,outcome_id):
+        user=request.user
+
+        #An employee can confirm only their own outcome
+
+        outcome =get_object_or_404(
+            Outcome.objects.filter(
+                company_id=user.company_id, 
+                employee=user,
+            ),
+            id=outcome_id
+        )
+
+        try:
+            outcome=confirm_outcome(outcome)
+        except DjangoValidationError as exc:
+            detail= (
+                exc.message_dict
+                if hasattr(exc,"message_dict")
+                else exc.messages
+            )
+            raise serializers.ValidationError(detail) from exc
+
+        return Response(
+            OutcomeSerializer(outcome).data,
+            status=status.HTTP_200_OK,
+        )
+
+    
     

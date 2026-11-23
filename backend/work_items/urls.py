@@ -5,6 +5,8 @@ from .views import (
     WorkItemTransitionAPIView,
     WorkExecutionStartAPIView,
     WorkExecutionStopAPIView,
+    WorkItemOutcomeCreateAPIView,
+    OutcomeConfirmAPIView,
 )
 
 urlpatterns = [
@@ -27,5 +29,15 @@ urlpatterns = [
         "executions/<uuid:execution_id>/stop/",
         WorkExecutionStopAPIView.as_view(),
         name="work-execution-stop",
+    ),
+    path(
+        "<uuid:work_item_id>/outcomes/",
+        WorkItemOutcomeCreateAPIView.as_view(),
+        name="work-item-outcome-create",
+    ),
+    path(
+        "outcomes/<uuid:outcome_id>/confirm/",
+        OutcomeConfirmAPIView.as_view(),
+        name="work-item-outcome-confirm",
     ),
 ]
